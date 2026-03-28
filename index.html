@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Morální dilemata — seřaď rozhodnutí</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f5f2ec;
+  --surface: #ffffff;
+  --surface2: #eeebe3;
+  --border: #d8d3c8;
+  --border2: #c4bfb3;
+  --text: #1a1814;
+  --text2: #5a5650;
+  --text3: #9a958e;
+  --accent: #2d4a3e;
+  --r1: #2d6a3e; --r2: #5c9e50; --r3: #a0b070;
+  --r4: #d4953a; --r5: #c85f30; --r6: #b83030;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: pan-y; /* allow scroll but we'll intercept card drags */
+}
+
+/* ── HEADER ── */
+header {
+  background: var(--accent);
+  padding: 20px 18px 16px;
+  color: #fff;
+}
+header h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.4rem;
+  font-weight: 400;
+  margin-bottom: 3px;
+}
+header p { font-size: 0.78rem; opacity: 0.62; font-weight: 300; line-height: 1.4; max-width: 600px; }
+
+/* ── POOL ── */
+.pool-section {
+  padding: 8px 14px 0;
+  max-width: 700px;
+  margin: 0 auto;
+}
+.section-label {
+  font-size: 0.63rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text3);
+  font-weight: 500;
+  margin-bottom: 9px;
+}
+.pool {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+.pool-empty {
+  text-align: center;
+  padding: 16px;
+  color: var(--text3);
+  font-size: 0.82rem;
+  background: var(--surface2);
+  border-radius: 12px;
+  border: 1.5px dashed var(--border2);
+}
+
+/* ── CARD ── */
+.card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 11px 13px;
+  touch-action: none;
+  cursor: grab;
+  position: relative;
+  /* NO transition on transform — causes jitter during drag */
+}
+.card:active { cursor: grabbing; }
+.card.is-dragging { opacity: 0.15; }
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 6px;
+}
+.card-ico {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; flex-shrink: 0;
+}
+.card-tag {
+  font-size: 0.61rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text3);
+  font-weight: 500;
+}
+.card-body {
+  font-size: 0.79rem;
+  line-height: 1.55;
+  color: var(--text2);
+}
+
+/* ── SCALE SECTION ── */
+.scale-section {
+  padding: 16px 14px 110px;
+  max-width: 700px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── SLOT ROW ── */
+.slot-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+/* left label */
+.slot-label {
+  width: 90px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 10px 0 10px 4px;
+  border-radius: 10px 0 0 10px;
+  border-left: 4px solid var(--slot-color);
+  padding-left: 10px;
+  background: color-mix(in srgb, var(--slot-color) 8%, var(--bg));
+}
+.slot-label-num {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--slot-color);
+}
+.slot-label-name {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text2);
+  margin-top: 2px;
+}
+.slot-label-sub {
+  font-size: 0.62rem;
+  color: var(--text3);
+  margin-top: 1px;
+}
+
+/* drop zone */
+.slot-zone {
+  flex: 1;
+  min-height: 72px;
+  border: 1.5px dashed var(--border2);
+  border-radius: 0 10px 10px 0;
+  background: var(--surface2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+
+/* hint text inside empty zone */
+.slot-zone-hint {
+  font-size: 0.72rem;
+  color: var(--text3);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.slot-zone-hint svg { opacity: 0.45; }
+
+/* drag-over state */
+.slot-zone.drag-over {
+  background: color-mix(in srgb, var(--slot-color) 12%, white);
+  border-color: var(--slot-color);
+  border-style: solid;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--slot-color) 20%, transparent);
+}
+
+/* ── FILLED slot: card inside with colored accent ── */
+.slot-zone.filled {
+  border: none;
+  background: transparent;
+  min-height: 0;
+  display: block;
+  padding: 0;
+}
+
+.slot-zone.filled .card {
+  border-left: 4px solid var(--slot-color);
+  border-radius: 0 10px 10px 0;
+  /* flash animation on drop */
+}
+
+/* flash highlight after drop */
+@keyframes flashDrop {
+  0%   { background: color-mix(in srgb, var(--slot-color) 22%, white); }
+  100% { background: var(--surface); }
+}
+.card.just-dropped {
+  animation: flashDrop 0.55s ease-out forwards;
+}
+
+/* ── GHOST ── */
+#ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  box-shadow: 0 14px 44px rgba(0,0,0,0.24);
+  transform: rotate(1.2deg) scale(1.04);
+  opacity: 0.97;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 11px 13px;
+  width: 260px;
+  display: none;
+}
+
+/* ── BOTTOM BAR ── */
+.bottom-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  z-index: 200;
+}
+.progress { flex: 1; font-size: 0.77rem; color: var(--text3); }
+.progress span { font-weight: 500; color: var(--accent); }
+
+button {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.82rem;
+  padding: 9px 15px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border2);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  white-space: nowrap;
+}
+button.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 500;
+}
+button.btn-primary:disabled { opacity: 0.36; cursor: default; }
+
+/* ── RESULT SHEET ── */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(20,18,14,0.55);
+  backdrop-filter: blur(3px);
+  z-index: 300;
+  display: none; align-items: flex-end;
+}
+.overlay.show { display: flex; }
+.sheet {
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  width: 100%; max-height: 90vh;
+  overflow-y: auto;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  animation: slideUp 0.28s cubic-bezier(0.34,1.1,0.64,1);
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.sheet-handle { width: 36px; height: 4px; border-radius: 4px; background: var(--border2); margin: 12px auto 0; }
+.sheet-header {
+  background: var(--accent); color: #fff;
+  padding: 14px 18px; margin: 12px 14px 0;
+  border-radius: 12px;
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.05rem; font-weight: 400;
+}
+.sheet-rows { padding: 8px 14px 0; }
+.sheet-row {
+  display: flex; align-items: center; gap: 11px;
+  padding: 10px 12px; border-radius: 10px;
+  margin-top: 6px; background: var(--bg);
+}
+.sheet-num { font-family: 'DM Serif Display', serif; font-size: 1.05rem; width: 20px; flex-shrink: 0; }
+.sheet-ico { font-size: 16px; width: 24px; flex-shrink: 0; text-align: center; }
+.sheet-name { flex: 1; font-size: 0.84rem; font-weight: 500; }
+.sheet-badge {
+  font-size: 0.65rem; padding: 3px 8px;
+  border-radius: 20px; font-weight: 500;
+  color: #fff; white-space: nowrap;
+}
+.sheet-close {
+  display: block; width: calc(100% - 28px);
+  margin: 14px 14px 0; padding: 12px;
+  text-align: center; border-radius: 10px;
+  border: 1.5px solid var(--border2);
+  background: transparent;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.84rem; color: var(--text2);
+  cursor: pointer; touch-action: manipulation;
+}
+
+@media (min-width: 600px) {
+  header { padding: 26px 28px 20px; }
+  header h1 { font-size: 1.8rem; }
+  .pool-section, .scale-section { padding-left: 28px; padding-right: 28px; }
+  #ghost { width: 340px; }
+  .slot-label { width: 110px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Morální dilemata</h1>
+  <p>Řešení morálních dilemat vám umožní zažít etiku na vlastní kůži, rozvíjí kritické myšlení, empatii a ukazuje, že co člověk, to jiný žebříček morálních hodnot.</p>
+</header>
+
+<!-- POOL -->
+<div class="pool-section">
+  <p class="section-label">Zásobník karet</p>
+  <div class="pool" id="pool"></div>
+</div>
+
+<!-- SCALE with slots -->
+<div class="scale-section" id="scale-section"></div>
+
+<!-- GHOST (single shared element) -->
+<div id="ghost"></div>
+
+<!-- BOTTOM BAR -->
+<div class="bottom-bar">
+  <p class="progress" id="progress">Umístěno: <span>0 / 6</span></p>
+  <button onclick="resetAll()">↺ Znovu</button>
+  <button class="btn-primary" id="btn-submit" onclick="showResult()" disabled>Výsledek →</button>
+</div>
+
+<!-- RESULT SHEET -->
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeSheet()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">Tvoje výsledné pořadí</div>
+    <div class="sheet-rows" id="sheet-rows"></div>
+    <button class="sheet-close" onclick="closeSheet()">Zavřít</button>
+  </div>
+</div>
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const CARDS = [
+  {
+    id:'c1', ico:'🍺', tag:'Přátelství · zákon',
+    bg:'#e8f5e0', icoColor:'#3B6D11',
+    label:'Petr koupí Janovi alkohol',
+    body:'Jan chce koupit alkohol, i když mu ještě nebylo 18 let. Jeho kamarád Petr, který už 18 má, ví, že je to zakázané a že by mohli dostat pokutu nebo problém s rodiči. Přesto se Petr rozhodne pomoci Janovi alkohol koupit, aby ho nezklamal, i když tím porušuje zákon a riskuje následky.'
+  },
+  {
+    id:'c2', ico:'💊', tag:'Empatie · pravidla',
+    bg:'#fef3e0', icoColor:'#854F0B',
+    label:'Sestra ukradne léky',
+    body:'Sestra ví, že její kamarád Jan je velmi nervózní před cestou letadlem a hrozí mu kolaps. V nemocnici jsou dostupné léky proti stresu pouze pro pacienty. Přesto se sestra rozhodne ukrást léky a dát je Janovi, aby mu pomohla zvládnout cestu, i když tím porušuje pravidla nemocnice a riskuje napomenutí.'
+  },
+  {
+    id:'c3', ico:'🚬', tag:'Pohoda pacienta · řád',
+    bg:'#e0f0fb', icoColor:'#185FA5',
+    label:'Sestra podá cigaretu',
+    body:'Sestra si všimla, že pacient zoufale touží po cigaretě, i když mu to nemocniční pravidla zakazují. I přes zákaz se sestra rozhodla pacientovi cigaretu podat, protože věděla, že by ho to opravdu potěšilo, i když riskovala napomenutí od vedení nemocnice.'
+  },
+  {
+    id:'c4', ico:'💔', tag:'Věrnost · pravda',
+    bg:'#f5e8fc', icoColor:'#3C3489',
+    label:'Eva skryje nevěru',
+    body:'Eva ví, že její nejlepší kamarádka je v dlouhodobém vztahu, ale podvádí partnera. Eva ví, že pokud to odhalí, zničí přátelství i vztah kamarádky. Rozhodne se držet tajemství, i když ví, že partner kamarádky by měl právo znát pravdu.'
+  },
+  {
+    id:'c5', ico:'🎪', tag:'Solidarita · festival',
+    bg:'#fde8e8', icoColor:'#993C1D',
+    label:'Adam podá náramek přes plot',
+    body:'Adam a Lukáš se chystají na festival Colours of Ostrava. Lukáš ještě nemá vstupní náramek a nemohl by projít turniketem. Adam ví, že by bylo proti pravidlům sundat náramek a podat ho Lukášovi přes plot – je to vlastně jako krádež vstupenky. Přesto se Adam rozhodne podat náramek Lukášovi, aby mohl projít, i když tím porušuje pravidla festivalu a riskuje problémy.'
+  },
+  {
+    id:'c6', ico:'🤖', tag:'Vzdělání · přátelství',
+    bg:'#e0f8ef', icoColor:'#0F6E56',
+    label:'Kamarádka nahlásí opisování',
+    body:'Kamarádka ví, že Ema často používá ChatGPT při opisování testů. Ví také, že pokud to učitelka zjistí, může Ema dostat pětku a pravděpodobně i napomenutí. Kamarádka se rozhodla to nahlásit učitelce, i když věděla, že tím ohrozí jejich přátelství a vztahy ve třídě.'
+  },
+];
+
+const COLORS = ['#2d6a3e','#5c9e50','#a0b070','#d4953a','#c85f30','#b83030'];
+const SCALE = [
+  {num:1, name:'Nejlepší',  sub:'morálně správné'},
+  {num:2, name:'Dobré',     sub:'omluvitelné'},
+  {num:3, name:'Průměrné',  sub:'sporné'},
+  {num:4, name:'Sporné',    sub:'problematické'},
+  {num:5, name:'Špatné',    sub:'těžko obhajitelné'},
+  {num:6, name:'Nejhorší',  sub:'morálně nesprávné'},
+];
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let slots = Array(6).fill(null);   // slots[i] = cardId | null
+let poolOrder = [];
+
+function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=0|Math.random()*(i+1);[b[i],b[j]]=[b[j],b[i]];}return b;}
+function cardById(id){return CARDS.find(c=>c.id===id);}
+
+// ─── DRAG STATE ──────────────────────────────────────────────────────────────
+let dragging = {
+  active: false,
+  cardId: null,
+  from: null,        // 'pool' | 0-5
+  offX: 0, offY: 0,
+  sourceEl: null,
+};
+const ghostEl = document.getElementById('ghost');
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+function init(){
+  const shuffled = shuffle(CARDS.map(c=>c.id));
+  slots = [...shuffled];   // předvyplněné sloty
+  poolOrder = [];          // prázdný pool
+  renderAll();
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function renderAll(){
+  renderPool();
+  renderScale();
+  updateProgress();
+}
+
+function renderPool(){
+  const pool = document.getElementById('pool');
+  pool.innerHTML = '';
+  const taken = new Set(slots.filter(Boolean));
+  const visible = poolOrder.filter(id => !taken.has(id));
+  if(!visible.length){ return; }
+  visible.forEach(id => {
+    pool.appendChild(makeCardEl(cardById(id), 'pool'));
+  });
+}
+
+function renderScale(){
+  const sec = document.getElementById('scale-section');
+  sec.innerHTML = '';
+  SCALE.forEach((s, i) => {
+    const color = COLORS[i];
+    const row = document.createElement('div');
+    row.className = 'slot-row';
+
+    // label
+    const lbl = document.createElement('div');
+    lbl.className = 'slot-label';
+    lbl.style.setProperty('--slot-color', color);
+    lbl.innerHTML = `
+      <span class="slot-label-num">${s.num}</span>
+      <span class="slot-label-name">${s.name}</span>
+      <span class="slot-label-sub">${s.sub}</span>`;
+    row.appendChild(lbl);
+
+    // drop zone
+    const zone = document.createElement('div');
+    zone.className = 'slot-zone' + (slots[i] ? ' filled' : '');
+    zone.dataset.slot = i;
+    zone.style.setProperty('--slot-color', color);
+
+    if(slots[i]){
+      const card = makeCardEl(cardById(slots[i]), i);
+      zone.appendChild(card);
+    } else {
+      zone.innerHTML = `<span class="slot-zone-hint">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+        sem přetáhni kartu</span>`;
+    }
+
+    row.appendChild(zone);
+    sec.appendChild(row);
+  });
+
+  // wire up mouse drop on zones
+  sec.querySelectorAll('.slot-zone').forEach(zone => {
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', e => { if(!zone.contains(e.relatedTarget)) zone.classList.remove('drag-over'); });
+    zone.addEventListener('drop', e => {
+      e.preventDefault(); zone.classList.remove('drag-over');
+      if(dragging.cardId) commitDrop(+zone.dataset.slot);
+    });
+  });
+
+  // pool drop (return card)
+  const pool = document.getElementById('pool');
+  pool.addEventListener('dragover', e => e.preventDefault());
+  pool.addEventListener('drop', e => {
+    e.preventDefault();
+    if(dragging.from !== 'pool' && dragging.from !== null){
+      slots[dragging.from] = null;
+      dragging.cardId = null; dragging.from = null;
+      renderAll();
+    }
+  });
+}
+
+// ─── MAKE CARD ELEMENT ────────────────────────────────────────────────────────
+function makeCardEl(card, from){
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.dataset.id = card.id;
+  el.innerHTML = `
+    <div class="card-head">
+      <div class="card-ico" style="background:${card.bg};color:${card.icoColor}">${card.ico}</div>
+      <span class="card-tag">${card.tag}</span>
+    </div>
+    <div class="card-body">${card.body}</div>`;
+
+  // ── Mouse drag ──
+  el.draggable = true;
+  el.addEventListener('dragstart', e => {
+    dragging.cardId = card.id;
+    dragging.from   = from;
+    e.dataTransfer.effectAllowed = 'move';
+    dragging.sourceEl = el;
+    setTimeout(() => el.classList.add('is-dragging'), 0);
+  });
+  el.addEventListener('dragend', () => {
+    el.classList.remove('is-dragging');
+    dragging.cardId = null; dragging.from = null; dragging.sourceEl = null;
+  });
+
+  // ── Touch drag ──
+  el.addEventListener('touchstart', e => onTouchStart(e, card.id, from), {passive: false});
+
+  return el;
+}
+
+// ─── COMMIT DROP ─────────────────────────────────────────────────────────────
+function commitDrop(targetSlot){
+  const id   = dragging.cardId;
+  const from = dragging.from;
+  if(!id) return;
+
+  const prev = slots[targetSlot]; // card already there (or null)
+
+  if(from === 'pool'){
+    slots[targetSlot] = id;
+    // if slot had a card, it goes back to pool automatically (renderPool filters by slots)
+  } else if(typeof from === 'number'){
+    // swap
+    slots[targetSlot] = id;
+    slots[from] = prev;
+  }
+
+  dragging.cardId = null; dragging.from = null; dragging.sourceEl = null;
+  renderAll();
+
+  // flash the card that just landed
+  requestAnimationFrame(() => {
+    const zone = document.querySelector(`.slot-zone[data-slot="${targetSlot}"]`);
+    if(zone){
+      const card = zone.querySelector('.card');
+      if(card){ card.classList.add('just-dropped'); card.addEventListener('animationend', () => card.classList.remove('just-dropped'), {once:true}); }
+    }
+  });
+}
+
+// ─── TOUCH DRAG ──────────────────────────────────────────────────────────────
+function onTouchStart(e, cardId, from){
+  // Only start drag if the touch stays still enough (not a scroll attempt)
+  // We use a threshold approach: start immediately but cancel on big Y movement
+  e.preventDefault(); // prevent scroll while dragging a card
+
+  const t = e.touches[0];
+  const rect = e.currentTarget.getBoundingClientRect();
+
+  dragging.active = true;
+  dragging.cardId = cardId;
+  dragging.from   = from;
+  dragging.offX   = t.clientX - rect.left;
+  dragging.offY   = t.clientY - rect.top;
+  dragging.sourceEl = e.currentTarget;
+
+  // build ghost
+  const card = cardById(cardId);
+  ghostEl.innerHTML = `
+    <div class="card-head">
+      <div class="card-ico" style="background:${card.bg};color:${card.icoColor}">${card.ico}</div>
+      <span class="card-tag">${card.tag}</span>
+    </div>
+    <div class="card-body">${card.label}</div>`;
+  ghostEl.style.width = rect.width + 'px';
+  ghostEl.style.display = 'block';
+  moveGhost(t.clientX, t.clientY);
+
+  e.currentTarget.classList.add('is-dragging');
+
+  document.addEventListener('touchmove',   onTouchMove,   {passive:false});
+  document.addEventListener('touchend',    onTouchEnd,    {passive:false});
+  document.addEventListener('touchcancel', onTouchCancel, {passive:false});
+}
+
+function moveGhost(cx, cy){
+  ghostEl.style.left = (cx - dragging.offX) + 'px';
+  ghostEl.style.top  = (cy - dragging.offY) + 'px';
+}
+
+let highlightedZone = null;
+
+function onTouchMove(e){
+  e.preventDefault();
+  const t = e.touches[0];
+  moveGhost(t.clientX, t.clientY);
+
+  // find element under finger
+  ghostEl.style.visibility = 'hidden';
+  const el = document.elementFromPoint(t.clientX, t.clientY);
+  ghostEl.style.visibility = 'visible';
+
+  // clear old highlight
+  if(highlightedZone){ highlightedZone.classList.remove('drag-over'); highlightedZone = null; }
+
+  if(!el) return;
+  const zone = el.closest('.slot-zone');
+  if(zone){ zone.classList.add('drag-over'); highlightedZone = zone; }
+}
+
+function onTouchEnd(e){
+  cleanup();
+  const t = e.changedTouches[0];
+
+  ghostEl.style.visibility = 'hidden';
+  const el = document.elementFromPoint(t.clientX, t.clientY);
+  ghostEl.style.visibility = 'visible';
+  ghostEl.style.display = 'none';
+
+  if(highlightedZone){ highlightedZone.classList.remove('drag-over'); highlightedZone = null; }
+  if(dragging.sourceEl) dragging.sourceEl.classList.remove('is-dragging');
+
+  if(!el){ dragging.cardId=null; dragging.from=null; return; }
+
+  const zone = el.closest('.slot-zone');
+  if(zone){
+    commitDrop(+zone.dataset.slot);
+    return;
+  }
+
+  // dropped on pool → return to pool
+  const pool = el.closest('#pool');
+  if(pool && dragging.from !== 'pool' && dragging.from !== null){
+    slots[dragging.from] = null;
+    dragging.cardId = null; dragging.from = null;
+    renderAll();
+    return;
+  }
+
+  dragging.cardId = null; dragging.from = null;
+}
+
+function onTouchCancel(){
+  cleanup();
+  ghostEl.style.display = 'none';
+  if(highlightedZone){ highlightedZone.classList.remove('drag-over'); highlightedZone = null; }
+  if(dragging.sourceEl) dragging.sourceEl.classList.remove('is-dragging');
+  dragging.cardId = null; dragging.from = null;
+}
+
+function cleanup(){
+  document.removeEventListener('touchmove',   onTouchMove);
+  document.removeEventListener('touchend',    onTouchEnd);
+  document.removeEventListener('touchcancel', onTouchCancel);
+}
+
+// ─── PROGRESS ────────────────────────────────────────────────────────────────
+function updateProgress(){
+  const n = slots.filter(Boolean).length;
+  document.querySelector('#progress span').textContent = n + ' / 6';
+  document.getElementById('btn-submit').disabled = n < 6;
+}
+
+// ─── RESULT ───────────────────────────────────────────────────────────────────
+function showResult(){
+  const rows = document.getElementById('sheet-rows');
+  rows.innerHTML = slots.map((id,i)=>{
+    const card = cardById(id);
+    return `<div class="sheet-row">
+      <span class="sheet-num" style="color:${COLORS[i]}">${i+1}</span>
+      <span class="sheet-ico">${card.ico}</span>
+      <span class="sheet-name">${card.label}</span>
+      <span class="sheet-badge" style="background:${COLORS[i]}">${SCALE[i].name}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('overlay').classList.add('show');
+}
+
+function closeSheet(){ document.getElementById('overlay').classList.remove('show'); }
+
+function resetAll(){ closeSheet(); init(); }
+
+// ─── GO ───────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
